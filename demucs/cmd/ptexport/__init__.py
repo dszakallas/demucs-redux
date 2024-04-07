@@ -4,8 +4,8 @@ import inspect
 
 import warnings
 
-# from ...pretrained import get_model
 from ...htdemucs import HTDemucs
+from ...states import set_state
 import torch
 
 
@@ -45,6 +45,7 @@ def load_model(path_or_package, strict=False):
         model = klass(*args, **kwargs)
 
     state = package["state"]
+    set_state(model, state)
     return model
 
 

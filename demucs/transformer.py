@@ -5,21 +5,18 @@
 # LICENSE file in the root directory of this source tree.
 # First author is Simon Rouard.
 
-import random
-import typing as tp
+from typing import Optional, List, Union, Any
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 import math
-
 
 def create_sin_embedding(
     length: int,
     dim: int,
     shift: int = 0,
-    device: tp.Optional[torch.device] = None,
+    device: Optional[torch.device] = None,
     max_period: float = 10000,
 ):
     # We aim for TBC format
@@ -41,7 +38,7 @@ def create_2d_sin_embedding(
     d_model: int,
     height: int,
     width: int,
-    device: tp.Optional[torch.device] = None,
+    device: Optional[torch.device] = None,
     max_period: float = 10000,
 ):
     """
@@ -86,7 +83,7 @@ def create_sin_embedding_cape(
     max_global_shift: float = 0.0,  # delta max
     max_local_shift: float = 0.0,  # epsilon max
     max_scale: float = 1.0,
-    device: tp.Optional[torch.device] = None,
+    device: Optional[torch.device] = None,
     max_period: float = 10000.0,
 ):
     # We aim for TBC format
@@ -257,6 +254,8 @@ class LayerScale(nn.Module):
 
 
 class MyGroupNorm(nn.Module):
+    VERSION = 1
+
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.group_norm = nn.GroupNorm(*args, **kwargs)
@@ -268,6 +267,36 @@ class MyGroupNorm(nn.Module):
         """
         x = x.transpose(1, 2)
         return self.group_norm.forward(x).transpose(1, 2)
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
+        """
+        In version 1, inheritence from GroupNorm is replaced with composition for TorchScript compatibility.
+        """
+        if local_metadata.get(f'version') is not None:
+            if local_metadata.get(f'version') > self.VERSION:
+                print(f"Warning: {self.__class__.__name__} version {local_metadata.get(f'version')} is higher than {self.VERSION}")
+                return
+            if local_metadata.get(f'version') == self.VERSION:
+                return
+
+        rm = set()
+        add = {}
+        for k, v in state_dict.items():
+            if k.startswith(prefix):
+                suffix = k[len(prefix):]
+                rm.add(k)
+                add.update({f'{prefix}group_norm.{suffix}': v})
+
+        for e in rm:
+            del state_dict[e]
+        state_dict.update(add)
+
+        super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs)
+
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        super()._save_to_state_dict(destination, prefix, keep_vars)
+        # Saving version information in 'local_metadata'
+        destination[prefix + 'local_metadata'] = {'version': self.VERSION}
 
 
 class MyTransformerEncoderLayer(nn.Module):
@@ -331,7 +360,7 @@ class MyTransformerEncoderLayer(nn.Module):
         self.src_mask = None
 
         if sparse:
-            self.self_attn = MultiheadAttention(
+            self.tel.self_attn = MultiheadAttention(
                 d_model,
                 nhead,
                 dropout=dropout,
@@ -344,8 +373,8 @@ class MyTransformerEncoderLayer(nn.Module):
     def forward(
         self,
         src: torch.Tensor,
-        src_mask: tp.Optional[torch.Tensor] = None,
-        src_key_padding_mask: tp.Optional[torch.Tensor] = None,
+        src_mask: Optional[torch.Tensor] = None,
+        src_key_padding_mask: Optional[torch.Tensor] = None,
     ):
         """
         if batch_first = False, src shape is (T, B, C)
@@ -384,6 +413,41 @@ class MyTransformerEncoderLayer(nn.Module):
             x = self.norm2(x + self.gamma_2(self._ff_block(x)))
 
         return x
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
+        """
+        In version 1, inheritence from TransformerEncoderLayer is replaced with composition for TorchScript compatibility.
+        """
+        if local_metadata.get(f'version') is not None:
+            if local_metadata.get(f'version') > self.VERSION:
+                print(f"Warning: {self.__class__.__name__} version {local_metadata.get(f'version')} is higher than {self.VERSION}")
+                return
+            if local_metadata.get(f'version') == self.VERSION:
+                return
+
+        tel_keys = { 'self_attn', 'linear1', 'linear2', 'norm1', 'norm2', 'dropout1', 'dropout2' }
+
+        rm = set()
+        add = {}
+
+        for k, v in state_dict.items():
+            if k.startswith(prefix):
+                suffix = k[len(prefix):]
+                direct_suffix = suffix.split('.')[0]
+                if direct_suffix in tel_keys:
+                    rm.add(k)
+                    add.update({f'{prefix}tel.{suffix}': v})
+
+        for e in rm:
+            del state_dict[e]
+        state_dict.update(add)
+
+        super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs)
+
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        super()._save_to_state_dict(destination, prefix, keep_vars)
+        # Saving version information in 'local_metadata'
+        destination[prefix + 'local_metadata'] = {'version': self.VERSION}
 
 
 class CrossTransformerEncoderLayer(nn.Module):
@@ -474,7 +538,7 @@ class CrossTransformerEncoderLayer(nn.Module):
                 self.mask = torch.zeros(1, 1)
                 self.mask_random_seed = mask_random_seed
 
-    def forward(self, q: torch.Tensor, k: torch.Tensor, mask: tp.Optional[torch.Tensor] = None):
+    def forward(self, q: torch.Tensor, k: torch.Tensor, mask: Optional[torch.Tensor] = None):
         """
         Args:
             q: tensor of shape (T, B, C)
@@ -514,7 +578,7 @@ class CrossTransformerEncoderLayer(nn.Module):
         return x
 
     # self-attention block
-    def _ca_block(self, q, k, attn_mask: tp.Optional[torch.Tensor] = None):
+    def _ca_block(self, q, k, attn_mask: Optional[torch.Tensor] = None):
         x = self.cross_attn(q, k, k, attn_mask=attn_mask, need_weights=False)[0]
         return self.dropout1(x)
 
@@ -533,9 +597,10 @@ class CrossTransformerEncoderLayer(nn.Module):
 
 
 class TransformerOrCrossEncoderLayer(nn.Module):
+    VERSION = 1
     """Utility class to switch between Transformer and CrossTransformer encoder layers."""
 
-    def __init__(self, encoder: tp.Union[MyTransformerEncoderLayer, CrossTransformerEncoderLayer]):
+    def __init__(self, encoder: Union[MyTransformerEncoderLayer, CrossTransformerEncoderLayer]):
         super().__init__()
         self.encoder = encoder
 
@@ -544,6 +609,37 @@ class TransformerOrCrossEncoderLayer(nn.Module):
             return self.encoder(x)
         else:
             return self.encoder(x, y)
+
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
+        """
+        In version 1, this class is used as union of transformer and cross encoder layer for TorchScript compatibility.
+        """
+        if local_metadata.get(f'version') is not None:
+            if local_metadata.get(f'version') > self.VERSION:
+                print(f"Warning: {self.__class__.__name__} version {local_metadata.get(f'version')} is higher than {self.VERSION}")
+                return
+            if local_metadata.get(f'version') == self.VERSION:
+                return
+
+        rm = set()
+        add = {}
+        for k, v in state_dict.items():
+            if k.startswith(prefix):
+                suffix = k[len(prefix):]
+                rm.add(k)
+                add.update({f'{prefix}encoder.{suffix}': v})
+
+        for e in rm:
+            del state_dict[e]
+        state_dict.update(add)
+
+        super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs)
+
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        super()._save_to_state_dict(destination, prefix, keep_vars)
+        # Saving version information in 'local_metadata'
+        destination[prefix + 'local_metadata'] = {'version': self.VERSION}
 
 
 # ----------------- MULTI-BLOCKS MODELS: -----------------------
@@ -567,7 +663,7 @@ class CrossTransformerEncoder(nn.Module):
         norm_out: bool = False,
         max_period: float = 10000.0,
         weight_decay: float = 0.0,
-        lr: tp.Optional[float] = None,
+        lr: Optional[float] = None,
         layer_scale: bool = False,
         gelu: bool = True,
         sin_random_shift: int = 0,
@@ -600,13 +696,20 @@ class CrossTransformerEncoder(nn.Module):
         self.weight_decay = weight_decay
         self.weight_pos_embed = weight_pos_embed
         self.sin_random_shift = sin_random_shift
-        self.cape_mean_normalize = cape_mean_normalize
-        self.cape_glob_loc_scale = cape_glob_loc_scale
-        self.position_embeddings = ScaledEmbedding(max_positions, dim, scale=0.2)
+        self.cape_mean_normalize: Optional[bool] = None
+        self.cape_mean_glob_loc_scale: Optional[List[float]] = None
+        self.cape_augment: Optional[bool] = None
+        if emb == "cape":
+            self.cape_mean_normalize = cape_mean_normalize
+            self.cape_glob_loc_scale = cape_glob_loc_scale
+            self.cape_augment = cape_augment
+        self.position_embeddings: Optional[nn.Module] = None
+        if emb == "scaled":
+            self.position_embeddings = ScaledEmbedding(max_positions, dim, scale=0.2)
 
         self.lr = lr
 
-        activation: tp.Any = F.gelu if gelu else F.relu
+        activation: Any = F.gelu if gelu else F.relu
 
         self.norm_in: nn.Module
         self.norm_in_t: nn.Module
@@ -707,7 +810,7 @@ class CrossTransformerEncoder(nn.Module):
         return x, xt
 
     def _get_pos_embedding(
-        self, T: int, B: int, C: int, device: tp.Optional[torch.device] = None
+        self, T: int, B: int, C: int, device: Optional[torch.device] = None
     ) -> torch.Tensor:
         if self.emb == "sin":
             # shift = random.randrange(self.sin_random_shift + 1)
@@ -716,6 +819,7 @@ class CrossTransformerEncoder(nn.Module):
                 T, C, shift=shift, device=device, max_period=self.max_period
             )
         elif self.emb == "cape":
+            assert self.cape_mean_normalize is not None
             pos_emb = create_sin_embedding_cape(
                 T,
                 C,
@@ -727,6 +831,7 @@ class CrossTransformerEncoder(nn.Module):
             )
 
         elif self.emb == "scaled":
+            assert self.position_embeddings is not None
             pos = torch.arange(T, device=device)
             pos_emb = self.position_embeddings(pos)[:, None]
         else:
