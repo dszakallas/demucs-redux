@@ -555,8 +555,8 @@ class HTDemucs(nn.Module):
                 is_inject, xt = saved_t[idx]
                 if is_inject:
                     x = encode(x, xt)
-            else:
-                x = encode(x)
+                else:
+                    x = encode(x)
             if idx == 0 and self.freq_emb is not None:
                 # add frequency embedding to allow for non equivariant convolutions
                 # over the frequency axis.
