@@ -568,14 +568,16 @@ class HTDemucs(nn.Module):
         if self.crosstransformer is not None:
             if self.bottom_channels:
                 B, C, f, t = x.shape
-                x = x.view(B, C, -1)
+                x = x.reshape(B, C, -1)
                 x = self.channel_upsampler(x)
-                x = x.view(B, C, f, t)
+                B, C, _ = x.shape
+                x = x.reshape(B, C, f, t)
                 xt = self.channel_upsampler_t(xt)
                 x, xt = self.crosstransformer(x, xt)
-                x = x.view(B, C, -1)
+                x = x.reshape(B, C, -1)
                 x = self.channel_downsampler(x)
-                x = x.view(B, C, f, t)
+                B, C, _ = x.shape
+                x = x.reshape(B, C, f, t)
                 xt = self.channel_downsampler_t(xt)
             else:
                 x, xt = self.crosstransformer(x, xt)

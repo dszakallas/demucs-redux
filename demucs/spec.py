@@ -30,7 +30,7 @@ def spectro(x, n_fft: int = 512, hop_length: int = 0, pad: int = 0):
         pad_mode="reflect",
     )
     _, freqs, frame = z.shape
-    return z.view(other + [freqs, frame])
+    return z.view(other + (freqs, frame))
 
 
 def ispectro(z, hop_length: int = 0, length: Optional[int] = None, pad: int = 0):
@@ -52,4 +52,4 @@ def ispectro(z, hop_length: int = 0, length: Optional[int] = None, pad: int = 0)
         center=True,
     )
     _, length = x.shape
-    return x.view(other + [length])
+    return x.view(other + (length,))
