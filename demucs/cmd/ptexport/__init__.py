@@ -1,75 +1,48 @@
 import argparse
+from os import makedirs
 from pathlib import Path
-import inspect
 
-import warnings
-
-from ...htdemucs import HTDemucs
-from ...states import set_state
+from ...pretrained import get_repo
 import torch
 
 
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("src", help="Input model file.")
-    parser.add_argument("dst", help="Output file to save the exported TorchScript model.")
-    parser.add_argument("--repo", type=str, help="Folder containing all pre-trained models.")
+    parser.add_argument(
+        "--src", nargs="*", help="Input model weights name/hash. If omitted exports all models."
+    )
+    parser.add_argument(
+        "-o",
+        "--out",
+        default="exported",
+        help="Output dir to save the exported model(s). Default: exported.",
+    )
+    parser.add_argument(
+        "--repo",
+        type=str,
+        help=f"Folder containing pre-trained models weights. If omitted remote repo is used.",
+    )
     return parser
 
 
-def load_model(path_or_package, strict=False):
-    """Load a model from the given serialized model, either given as a dict (already loaded)
-    or a path to a file on disk."""
-    if isinstance(path_or_package, dict):
-        package = path_or_package
-    elif isinstance(path_or_package, (str, Path)):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            path = path_or_package
-            package = torch.load(path, "cpu")
-    else:
-        raise ValueError(f"Invalid type for {path_or_package}.")
-
-    klass = package["klass"]
-    args = package["args"]
-    kwargs = package["kwargs"]
-
-    if strict:
-        model = klass(*args, **kwargs)
-    else:
-        sig = inspect.signature(klass)
-        for key in list(kwargs):
-            if key not in sig.parameters:
-                warnings.warn("Dropping inexistant parameter " + key)
-                del kwargs[key]
-        model = klass(*args, **kwargs)
-
-    state = package["state"]
-    set_state(model, state)
-    return model
-
-
-def main(opts=None):
+def main():
     # Example usage
     parser = get_parser()
-    args = parser.parse_args(opts)
+    args = parser.parse_args()
 
-    model = load_model(args.src)
+    repo = None
+    if args.repo:
+        repo = Path(args.repo)
 
-    if isinstance(model, HTDemucs):
-        model.segment = float(model.segment)
+    repo = get_repo(repo)
 
-    torch.jit.save(torch.jit.script(model), args.dst)
+    models = args.src
 
-    # model = get_model(args.name, args.repo)
-    # htdemucs = []
-    # if isinstance(model, BagOfModels):
-    #     for model in model.models:
-    #         if isinstance(model, HTDemucs):
-    #             htdemucs.append(model)
+    if not models:
+        models = repo.list_model()
 
-    # if isinstance(model, HTDemucs):
-    #     htdemucs.append(model)
+    makedirs(args.out, exist_ok=True)
 
-    # for htd in htdemucs:
-    #     htd.segment = float(htd.segment)
+    for model in models:
+        model = repo.get_model(model)
+        torch.jit.save(torch.jit.script(model), args.out / f"{model}.pt")

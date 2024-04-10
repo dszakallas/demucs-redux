@@ -3,6 +3,8 @@ from torch import Tensor
 from torch.nn import functional as F
 from typing import Union
 
+import functools
+
 
 def unfold(a: Tensor, kernel_size: int, stride: int):
     """Given input of size [*OT, T], output Tensor of size [*OT, F, K]
@@ -12,14 +14,14 @@ def unfold(a: Tensor, kernel_size: int, stride: int):
 
     see https://github.com/pytorch/pytorch/issues/60466
     """
-    *shape, length = a.shape
+    shape, length = a.shape[:-1], a.shape[-1]
     n_frames = math.ceil(length / stride)
     tgt_length = (n_frames - 1) * stride + kernel_size
     a = F.pad(a, (0, tgt_length - length))
     strides = list(a.stride())
     assert strides[-1] == 1, "data should be contiguous"
     strides = strides[:-1] + [stride, 1]
-    return a.as_strided([*shape, n_frames, kernel_size], strides)
+    return a.as_strided(shape + (n_frames, kernel_size), strides)
 
 
 def center_trim(tensor: Tensor, reference: Union[Tensor, int]):
@@ -39,3 +41,12 @@ def center_trim(tensor: Tensor, reference: Union[Tensor, int]):
     if delta:
         tensor = tensor[..., delta // 2 : -(delta - delta // 2)]
     return tensor
+
+
+def capture_init(init):
+    @functools.wraps(init)
+    def __init__(self, *args, **kwargs):
+        self._init_args_kwargs = (args, kwargs)
+        init(self, *args, **kwargs)
+
+    return __init__

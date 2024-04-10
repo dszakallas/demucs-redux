@@ -17,9 +17,10 @@ from torch.nn import functional as F
 from .transformer import CrossTransformerEncoder
 
 from .demucs import rescale_module
-from .states import capture_init
 from .spec import spectro, ispectro
 from .hdemucs import pad1d, ScaledEmbedding, HEncLayer, MultiWrap, HDecLayer
+
+from .utils import capture_init
 
 
 class HTDemucs(nn.Module):
