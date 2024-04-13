@@ -2,26 +2,14 @@ import argparse
 from os import makedirs
 from pathlib import Path
 
-from ...pretrained import get_repo
+from ...states import load_model
 import torch
 
 
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--src", nargs="*", help="Input model weights name/hash. If omitted exports all models."
-    )
-    parser.add_argument(
-        "-o",
-        "--out",
-        default="exported",
-        help="Output dir to save the exported model(s). Default: exported.",
-    )
-    parser.add_argument(
-        "--repo",
-        type=str,
-        help=f"Folder containing pre-trained models weights. If omitted remote repo is used.",
-    )
+    parser.add_argument("src", help="Input weights URL/path.")
+    parser.add_argument("dst", help="Output path to write.")
     return parser
 
 
@@ -30,19 +18,12 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
-    repo = None
-    if args.repo:
-        repo = Path(args.repo)
+    pkg = torch.hub.load_state_dict_from_url(
+        args.src, map_location="cpu", check_hash=True
+    )  # type: ignore
 
-    repo = get_repo(repo)
+    m = load_model(pkg)
 
-    models = args.src
-
-    if not models:
-        models = repo.list_model()
-
-    makedirs(args.out, exist_ok=True)
-
-    for model in models:
-        model = repo.get_model(model)
-        torch.jit.save(torch.jit.script(model), args.out / f"{model}.pt")
+    args.dst = Path(args.dst)
+    makedirs(args.dst.parent, exist_ok=True)
+    torch.jit.save(torch.jit.script(m), args.dst)

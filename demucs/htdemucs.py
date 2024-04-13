@@ -361,6 +361,10 @@ class HTDemucs(nn.Module):
             rescale_module(self, reference=rescale)
 
         transformer_channels = channels * growth ** (depth - 1)
+        self.channel_upsampler = None
+        self.channel_downsampler = None
+        self.channel_upsampler_t = None
+        self.channel_downsampler_t = None
         if bottom_channels:
             self.channel_upsampler = nn.Conv1d(transformer_channels, bottom_channels, 1)
             self.channel_downsampler = nn.Conv1d(bottom_channels, transformer_channels, 1)
@@ -568,6 +572,10 @@ class HTDemucs(nn.Module):
 
         if self.crosstransformer is not None:
             if self.bottom_channels:
+                assert self.channel_upsampler is not None
+                assert self.channel_downsampler is not None
+                assert self.channel_upsampler_t is not None
+                assert self.channel_downsampler_t is not None
                 B, C, f, t = x.shape
                 x = x.reshape(B, C, -1)
                 x = self.channel_upsampler(x)

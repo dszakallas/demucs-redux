@@ -8,7 +8,7 @@ This code contains the spectrogram and Hybrid version of Demucs.
 """
 from copy import deepcopy
 import math
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 from openunmix.filtering import wiener
 import torch
@@ -121,15 +121,16 @@ class HEncLayer(nn.Module):
             pad = [pad, 0]
             klass = nn.Conv2d
         self.conv = klass(chin, chout, kernel_size, stride, pad)
+        self.norm1 = None
+        self.rewrite = None
+        self.dconv = None
         if self.empty:
             return
         self.norm1 = norm_fn(chout)
-        self.rewrite = None
         if rewrite:
             self.rewrite = klass(chout, 2 * chout, 1 + 2 * context, 1, context)
             self.norm2 = norm_fn(2 * chout)
 
-        self.dconv = None
         if dconv:
             self.dconv = DConv(chout, **dconv_kw)
 
@@ -154,6 +155,7 @@ class HEncLayer(nn.Module):
             if inject.dim() == 3 and y.dim() == 4:
                 inject = inject[:, :, None]
             y = y + inject
+        assert self.norm1 is not None
         y = F.gelu(self.norm1(y))
         if self.dconv is not None:
             if self.freq:
@@ -317,9 +319,10 @@ class HDecLayer(nn.Module):
             klass_tr = nn.ConvTranspose2d
         self.conv_tr = klass_tr(chin, chout, kernel_size, stride)
         self.norm2 = norm_fn(chout)
+        self.rewrite = None
+        self.dconv = None
         if self.empty:
             return
-        self.rewrite = None
         if rewrite:
             if context_freq:
                 self.rewrite = klass(chin, 2 * chin, 1 + 2 * context, 1, context)
@@ -327,7 +330,6 @@ class HDecLayer(nn.Module):
                 self.rewrite = klass(chin, 2 * chin, [1, 1 + 2 * context], 1, [0, context])
             self.norm1 = norm_fn(2 * chin)
 
-        self.dconv = None
         if dconv:
             self.dconv = DConv(chin, **dconv_kw)
 
@@ -646,11 +648,11 @@ class HDemucs(nn.Module):
                 x = pad1d(x, (pad, pad + le * hl - x.shape[-1]), mode="reflect")
             else:
                 x = pad1d(x, (pad, pad + le * hl - x.shape[-1]))
-
-        z = spectro(x, nfft, hl)[..., :-1, :]
-        if self.hybrid:
+            z = spectro(x, nfft, hl)[..., :-1, :]
             assert z.shape[-1] == le + 4, (z.shape, x.shape, le)
             z = z[..., 2 : 2 + le]
+        else:
+            z = spectro(x, nfft, hl)[..., :-1, :]
         return z
 
     def _ispec(self, z, length=None, scale=0):
@@ -752,8 +754,8 @@ class HDemucs(nn.Module):
         # okay, this is a giant mess I know...
         saved = []  # skip connections, freq.
         saved_t = []  # skip connections, time.
-        lengths = []  # saved lengths to properly remove padding, freq branch.
-        lengths_t = []  # saved lengths for time branch.
+        lengths: List[int] = []  # saved lengths to properly remove padding, freq branch.
+        lengths_t: List[int] = []  # saved lengths for time branch.
         for idx, encode in enumerate(self.encoder):
             lengths.append(x.shape[-1])
             inject = None

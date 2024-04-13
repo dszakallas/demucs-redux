@@ -1,0 +1,19 @@
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - run: |
+        curl -sSL https://install.python-poetry.org | python3
+    - name: Configure Poetry
+      run: |
+        echo "$HOME/.poetry/bin" >> $GITHUB_PATH
+        poetry config virtualenvs.create false
+    - run: poetry install
+    - run: ./hack/smoke-ptexport.py
