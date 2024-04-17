@@ -11,22 +11,22 @@
 # https://dl.fbaipublicfiles.com/demucs/mdx_final/b72baf4e-8778635e.th
 # https://dl.fbaipublicfiles.com/demucs/mdx_final/42e558d4-196e0e1b.th
 # https://dl.fbaipublicfiles.com/demucs/mdx_final/305bc58f-18378783.th
-# https://dl.fbaipublicfiles.com/mdx_final/14fc6a69-a89dd0ee.th
-# https://dl.fbaipublicfiles.com/mdx_final/464b36d7-e5a9386e.th
-# https://dl.fbaipublicfiles.com/mdx_final/7fd6ef75-a905dd85.th
-# https://dl.fbaipublicfiles.com/mdx_final/83fc094f-4a16d450.th
-# https://dl.fbaipublicfiles.com/mdx_final/1ef250f1-592467ce.th
-# https://dl.fbaipublicfiles.com/mdx_final/902315c2-b39ce9c9.th
-# https://dl.fbaipublicfiles.com/mdx_final/9a6b4851-03af0aa6.th
-# https://dl.fbaipublicfiles.com/mdx_final/fa0cb7f9-100d8bf4.th
+# https://dl.fbaipublicfiles.com/demucs/mdx_final/14fc6a69-a89dd0ee.th
+# https://dl.fbaipublicfiles.com/demucs/mdx_final/464b36d7-e5a9386e.th
+# https://dl.fbaipublicfiles.com/demucs/mdx_final/7fd6ef75-a905dd85.th
+# https://dl.fbaipublicfiles.com/demucs/mdx_final/83fc094f-4a16d450.th
+# https://dl.fbaipublicfiles.com/demucs/mdx_final/1ef250f1-592467ce.th
+# https://dl.fbaipublicfiles.com/demucs/mdx_final/902315c2-b39ce9c9.th
+# https://dl.fbaipublicfiles.com/demucs/mdx_final/9a6b4851-03af0aa6.th
+# https://dl.fbaipublicfiles.com/demucs/mdx_final/fa0cb7f9-100d8bf4.th
 
 ## Hybrid Transformer models
-https://dl.fbaipublicfiles.com/hybrid_transformer/955717e8-8726e21a.th
-https://dl.fbaipublicfiles.com/hybrid_transformer/f7e0c4bc-ba3fe64a.th
-https://dl.fbaipublicfiles.com/hybrid_transformer/d12395a8-e57c48e6.th
-https://dl.fbaipublicfiles.com/hybrid_transformer/92cfc3b6-ef3bcb9c.th
-https://dl.fbaipublicfiles.com/hybrid_transformer/04573f0d-f3cf25b2.th
-# https://dl.fbaipublicfiles.com/hybrid_transformer/75fc33f5-1941ce65.th
+https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/955717e8-8726e21a.th
+https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/f7e0c4bc-ba3fe64a.th
+https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/d12395a8-e57c48e6.th
+https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/92cfc3b6-ef3bcb9c.th
+https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th
+# https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/75fc33f5-1941ce65.th
 
 # Experimental 6 sources model
-https://dl.fbaipublicfiles.com/hybrid_transformer/5c90dfd2-34c22ccb.th
+https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th
